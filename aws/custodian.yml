@@ -1,0 +1,253 @@
+#
+# Checks S3 for buckets that have cross-account access. Removes the cross-account access
+# if true.
+#
+policies:
+- name: s3-cross-account
+  description: |
+    Checks S3 for buckets with cross-account access and
+    removes the cross-account access.
+  resource: s3
+  conditions:
+    - region: us-east-1
+  filters:
+    - type: cross-account
+  actions:
+    - type: remove-statements
+      statement_ids: matched
+
+#
+# Provisions a Lambda function and CloudWatch event target that looks at all new EC2
+# instances and terminates those with unencrypted EBS volumes
+# 
+- name: ec2-require-non-public-and-encrypted-volumes
+  resource: aws.ec2
+  description: |
+    Provision a lambda and cloud watch event target
+    that looks at all new instances and terminates those with
+    unencrypted volumes.
+  mode:
+    type: cloudtrail
+    role: Cloud_Custodian_Role
+    events:
+      - RunInstances
+  filters:
+    - type: ebs
+      key: Encrypted
+      value: false
+  actions:
+    - terminate
+
+#
+# Schedule a resource that does not meet tag compliance policies to be 
+# stopped in four (4) days.
+#
+- name: tag-compliance
+  resource: aws.ec2
+  description: |
+    Schedule a resource that does not meet tag compliance policies
+    to be stopped in four days.
+  filters:
+    - State.Name: running
+    - "tag:Environment": absent
+    - "tag:AppId": absent
+    - or:
+      - "tag:Owner": absent
+      - "tag:Department": absent
+  actions:
+    - type: mark-for-op
+      op: stop
+      days: 4
+
+# 
+# Triggers when a new S3 bucket is created. Applies the AWS AES256 default bucket
+# encryption, tags the creator ID, enables object versioning, configures the 
+# bucket lifecycle and enables logging.
+#
+- name: s3-configure-standards-real-time
+  resource: s3
+  description: |
+    This policy is triggered when a new S3 bucket is created and it applies
+    the AWS AES256 Default Bucket Encryption, Tags the creators ID, enables
+    object versioning, configures the bucket lifecycle and enables logging.
+  mode:
+    type: cloudtrail
+    events:
+      - CreateBucket
+    role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
+    timeout: 200
+  actions:
+    - type: auto-tag-user
+      tag: CreatorName
+    - type: set-bucket-encryption
+    - type: toggle-versioning
+      enabled: true
+    - type: toggle-logging
+      target_bucket: "{account_id}-{region}-s3-logs"
+      target_prefix: "{source_bucket_name}/"
+    - type: configure-lifecycle
+      rules:
+      - ID: company-s3-lifecycle
+        Status: Enabled
+        Filter:
+            Prefix: /
+        Transitions:
+          - Days: 180
+            StorageClass: STANDARD_IA
+        NoncurrentVersionExpiration:
+            NoncurrentDays: 35
+
+#
+# Appends a bucket policy to an S3 bucket when the Lambda detects a policy change
+# or a new bucket is created.
+#
+- name: s3-deny-public-object-acl-realtime
+  resource: s3
+  mode:
+    type: cloudtrail
+    events:
+      - CreateBucket
+      - source: 's3.amazonaws.com'
+        event: PutBucketPolicy
+        ids: "requestParameters.bucketName"
+    role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
+    timeout: 200
+  description: |
+    Appends a bucket policy to an S3 bucket when it detects
+    a policy change or a new bucket is created which
+    will deny anyone except AWS logging services from setting
+    S3 objects in the bucket to public-read, public-read-write, or
+    any authenticated AWS user.
+  actions:
+    - type: set-statements
+      statements:
+        - Sid: "DenyS3PublicObjectACL"
+          Effect: "Deny"
+          Action: "s3:PutObjectAcl"
+          NotPrincipal:
+              "AWS":
+                  - "arn:aws:iam::858827067514:root"
+                  - "arn:aws:iam::193672423079:user/logs"
+                  - "arn:aws:iam::210876761215:user/logs"
+                  - "arn:aws:iam::127311923021:root"
+                  - "arn:aws:iam::156460612806:root"
+          Resource:
+              - "arn:aws:s3:::{bucket_name}/*"
+              - "arn:aws:s3:::{bucket_name}"
+          Condition:
+            StringEqualsIgnoreCaseIfExists:
+                's3:x-amz-acl':
+                    - "public-read"
+                    - "public-read-write"
+                    - "authenticated-read"
+
+# 
+# Scan buckets that allow for global access in their ACLs and 
+# delete the associated ACL permissions.
+# https://cloudcustodian.io/docs/aws/examples/s3globalgrants.html
+#        
+- name: s3-global-access
+  resource: s3
+  filters:
+    - type: global-grants
+  actions:
+    - type: delete-global-grants
+      grantees:
+        - "http://acs.amazonaws.com/groups/global/AllUsers"
+        - "http://acs.amazonaws.com/groups/global/AuthenticatedUsers"
+
+#
+# Enable bucket encryption on all s3 buckets
+# https://cloudcustodian.io/docs/aws/examples/s3encryption.html#enable-bucket-encryption
+# 
+- name: s3-set-bucket-encryption
+  resource: s3
+  actions:
+    - type: set-bucket-encryption
+      crypto: AES256
+      enabled: True
+
+#
+# Scan all keys in the bucket for unencrypted keys and by default 
+# remediate them such that they are encrypted.
+# https://cloudcustodian.io/docs/aws/examples/s3encryption.html#enable-bucket-encryption
+# 
+- name: s3-key-encryption
+  resource: s3
+  actions:
+    - type: encrypt-keys
+      crypto: aws:kms
+
+#
+# Trigger a Lambda function in the AWS account and region anytime a user creates or 
+# modifies a security group to auto-remove the rule.
+# https://cloudcustodian.io/docs/aws/examples/securitygroupsdetectremediate.html
+# 
+- name: high-risk-security-groups-remediate
+  resource: security-group
+  description: |
+    Remove any rule from a security group that allows 0.0.0.0/0 or ::/0 (IPv6) ingress
+    and notify the user  who added the violating rule.
+  mode:
+      type: cloudtrail
+      events:
+        - source: ec2.amazonaws.com
+          event: AuthorizeSecurityGroupIngress
+          ids: "responseElements.securityGroupRuleSet.items[].groupId"
+        - source: ec2.amazonaws.com
+          event: AuthorizeSecurityGroupEgress
+          ids: "responseElements.securityGroupRuleSet.items[].groupId"
+        - source: ec2.amazonaws.com
+          event: RevokeSecurityGroupEgress
+          ids: "requestParameters.groupId"
+        - source: ec2.amazonaws.com
+          event: RevokeSecurityGroupIngress
+          ids: "requestParameters.groupId"
+        - source: ec2.amazonaws.com
+          event: ModifySecurityGroupRules
+          ids: "requestParameters.ModifySecurityGroupRulesRequest.GroupId"
+      role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
+  filters:
+    - or:
+          - type: ingress
+            Cidr:
+              value: "0.0.0.0/0"
+          - type: ingress
+            CidrV6:
+              value: "::/0"
+  actions:
+      - type: remove-permissions
+        ingress: matched
+      - type: webhook
+        url: $WEBHOOK_URL
+        query-params:                      
+            resource_name: resource.name   
+            policy_name: policy.name
+
+#
+# Triggers a Lambda function in the AWS account and region anytime the root user of the account logs in
+# https://cloudcustodian.io/docs/aws/examples/accountrootlogin.html
+# 
+- name: root-user-login-detected
+  resource: account
+  description: |
+    Notifies Security and Cloud Admins teams on any AWS root user console logins
+  mode:
+      type: cloudtrail
+      events:
+        - ConsoleLogin
+      role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
+  filters:
+      - type: event
+        key: "detail.userIdentity.type"
+        value_type: swap
+        op: in
+        value: Root
+  actions:
+    - type: webhook
+      url: $WEBHOOK_URL
+      batch: true
+      body: 'resources[].name'
+      query-params:
+        count: 'resources[] | length(@)'
+        static-value: '`foo`'
