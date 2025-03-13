@@ -78,5 +78,23 @@ The output should look something like this.
 - Store Custodian output to a separate S3 bucket
 - Configure custodian policies for Microsoft Azure
 
+# Scenarios
+
+1. S3
+   - Remove cross-account access
+   - Standardize buckets to encrypt at rest, enable versioning, configure logging, lifecycle policies, etc.
+   - Append an ACL bucket policy
+   - Delete global grants, if detected
+   - Enable encryption at rest (AES)
+
+2. RDS
+   - Terminate public or unencrypted RDS instances
+  
+3. Cost Optimization
+   - Terminate EC2 instances outside of us-east-1
+   - Terminate ALB instances outside of us-east-1
+   - Terminate ELB instances outside of us-east-1
+   - Auto tag new EC2 instances
+
 # Feedback
 I would welcome any feedback on the setup instructions, Cloud Custodian policies, or overall cloud governance approach. Please keep in mind that these policies are intended to demo the tool.
