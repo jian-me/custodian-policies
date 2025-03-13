@@ -1,3 +1,5 @@
+<img width="826" alt="image" src="https://github.com/user-attachments/assets/de239473-c66d-4378-b7d6-ec17f027e2dc" />
+
 # Cloud Governance
 Cloud governance is the practice of managing the cost, compliance, performance, and security of cloud services. Often, cloud governance is associated with the use of public cloud providers, such as AWS and Azure, but it may also extend to private, hybrid, and on-prem infrastructure. 
  
@@ -16,7 +18,7 @@ Notes:
 2. You will need the latest version of `python3` installed.
 3. The demo policy configures the new S3 buckets to log events to a separate bucket called `{account_id}-{region}-s3-logs`. You will need to create this bucket manually for via IaC before you run Custodian.
 
-**Installation:**
+## Installation
 1. Install Cloud Custodian via CLI. You can install using Docker as well.
 
 ```
@@ -71,7 +73,7 @@ The output should look something like this.
 
 <img width="986" alt="image" src="https://github.com/user-attachments/assets/f992487c-c229-40fb-b41c-6831d045fd3b" />
 
-**Future / Planned Work:**
+## Future / Planned Work
 - Add custodian policies for IAM and other common AWS services
 - Store Custodian output to a separate S3 bucket
 - Configure custodian policies for Microsoft Azure
