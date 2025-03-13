@@ -1,10 +1,10 @@
 # Cloud Governance
 Cloud governance is the practice of managing the cost, compliance, performance, and security of cloud services. Often, cloud governance is associated with the use of public cloud providers, such as AWS and Azure, but it may also extend to private, hybrid, and on-prem infrastructure. 
  
-# What are the Risks?
+## What are the Risks?
 Improper governance of cloud services may lead to unnecessary spend, loss of service availability, or unauthorized data or system access. Given the volume of data that companies process and store in their cloud infrastructure and the criticality of most cloud services to business operations, the impact of such risks may be material.
 
-# What are Potential Mitigations?
+## What are Potential Mitigations?
 From a security perspective, there are many cloud governance solutions often grouped under the term "Cloud Security Posture Management" or CSPM. I have created sample policies to demonstrate the capabilities of an open-source cloud governance tool called Cloud Custodian (https://cloudcustodian.io/). These policies and scripts demonstrate the capabilities of Cloud Custodian to configure common public cloud security controls. The policies are meant to be used in conjunction with other controls.
 
 # Getting Started
@@ -29,7 +29,7 @@ pip install c7n
 
 ```
 mkdir custodian
-cd custodian
+cd ./custodian
 ```
 
 3. In your AWS account, create an IAM Role called "Cloud_Custodian_Role" with the appropriate permissions. Since Cloud Custodian creates Lambda functions to execute actions, you will need to define a trust policy.
@@ -55,7 +55,7 @@ cd custodian
 5. In Terminal, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 
 ```
-export AWS_ACCESS_KEY_ID=<Access Key you copied for the IAM User>
+export AWS_ACCESS_KEY_ID = <Access Key you copied for the IAM User>
 export AWS_SECRET_ACCESS_KEY = <Secret Access Key you copied for the IAM User>
 ```
 
