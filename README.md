@@ -69,9 +69,12 @@ custodian run --output-dir=. custodian.yml
 
 The output should look something like this.
 
-<img width="986" alt="image" src="https://github.com/user-attachments/assets/b7c7cd71-373d-466b-a07e-def77ebb59b5" />
+<img width="986" alt="image" src="https://github.com/user-attachments/assets/f992487c-c229-40fb-b41c-6831d045fd3b" />
 
-# Future / Planned Work:
+**Future / Planned Work:**
 - Add custodian policies for IAM and other common AWS services
 - Store Custodian output to a separate S3 bucket
 - Configure custodian policies for Microsoft Azure
+
+# Feedback
+I would welcome any feedback on the setup instructions, Cloud Custodian policies, or overall cloud governance approach. Please keep in mind that these policies are intended to demo the tool.
