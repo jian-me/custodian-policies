@@ -1,0 +1,123 @@
+#
+# Checks if the EC2 instance was created in us-east-1. If not, terminate the
+# instance and notify via webhook.
+# https://cloudcustodian.io/docs/aws/examples/blocknonstandardregionresources.html
+#
+policies:
+- name: ec2-terminate-non-standard-region
+  resource: ec2
+  description: |
+        Any EC2 instance launched in a non standard region outside
+        of us-east-1 and eu-west-1 will be terminated
+  mode:
+        type: cloudtrail
+        events:
+          - RunInstances
+        role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
+  filters:
+        - type: event
+          key: "detail.awsRegion"
+          op: not-in
+          value:
+            - us-east-1
+  actions:
+        - type: terminate
+          force: true
+        - type: webhook
+          url: $WEBHOOK_URL
+          query-params:                      
+            resource_name: resource.name   
+            policy_name: policy.name
+            action: 'EC2 SERVER TERMINATED - Non-Standard Region'
+
+#
+# Checks if the ALB instance was created in us-east-1. If not, terminate the
+# instance and notify via webhook.
+# https://cloudcustodian.io/docs/aws/examples/blocknonstandardregionresources.html
+#
+- name: app-elb-terminate-non-standard-region
+  resource: app-elb
+  mode:
+          type: cloudtrail
+          events:
+                - source: "elasticloadbalancing.amazonaws.com"
+                  event: CreateLoadBalancer
+                  ids: "requestParameters.name"
+          role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
+  description: |
+          Detect when a new Application Load Balancer Group is created in a non-standard
+          region and delete it and notify the customer
+  filters:
+        - type: event
+          key: "detail.awsRegion"
+          op: not-in
+          value:
+                  - us-east-1
+                  - eu-west-1
+  actions:
+        - type: delete
+        - type: webhook
+          url: $WEBHOOK_URL
+          query-params:                      
+            resource_name: resource.name   
+            policy_name: policy.name
+            action: 'ALB TERMINATED - Non-Standard Region'
+
+#
+# Checks if the ELB instance was created in us-east-1. If not, terminate the
+# instance and notify via webhook.
+# https://cloudcustodian.io/docs/aws/examples/blocknonstandardregionresources.html
+#
+- name: elb-terminate-non-standard-region
+  resource: elb
+  mode:
+        type: cloudtrail
+        events:
+           - CreateLoadBalancer
+        role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
+  description: |
+          Detect when a new Load Balancer is created in a non-standard
+          region and delete it and notify the customer
+  filters:
+        - type: event
+          key: "detail.awsRegion"
+          op: not-in
+          value:
+                  - us-east-1
+                  - eu-west-1
+  actions:
+        - type: delete
+        - type: webhook
+          url: $WEBHOOK_URL
+          query-params:                      
+            resource_name: resource.name   
+            policy_name: policy.name
+            action: 'ELB TERMINATED - Non-Standard Region'
+
+#
+# Automatically tags an EC2 instance created in us-east-1 if the owner tag does not already exist
+#
+- name: ec2-auto-tag-creator
+  description: Auto-tag Creator on EC2 if not set.
+  resource: aws.ec2
+  mode:
+      type: cloudtrail
+      events:
+        - RunInstances
+      role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
+  conditions:
+      - type: value           
+        key: region
+        op: in
+        value:
+            - us-east-1
+      - not:
+        - type: event         
+          key: "detail.userIdentity.arn"
+          op: regex-case
+          value: '.*(CloudCustodian|Jenkins|AWS.*ServiceRole|LambdaFunction|\/sfr-|\/i-|\d{8,}$)'
+  filters:
+      - "tag:Owner": empty
+  actions:
+      - type: auto-tag-user
+        tag: Owner

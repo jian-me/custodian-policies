@@ -1,0 +1,22 @@
+#
+# Terminates any unencrypted (at rest) or publicly accessible RDS database 
+# instances upon creation. Snapshot will not be taken
+# https://cloudcustodian.io/docs/aws/examples/rdspublicunencrypted.html
+#
+policies:
+- name: terminate-unencrypted-public-rds
+  description: |
+    Terminate all unencrypted or publicly available RDS upon creation
+  resource: rds
+  mode:
+    type: cloudtrail
+    events:
+      - CreateDBInstance
+    role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
+  filters:
+    - or:
+        - StorageEncrypted: false
+        - PubliclyAccessible: true
+  actions:
+    - type: delete
+      skip-snapshot: true
